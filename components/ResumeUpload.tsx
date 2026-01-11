@@ -1,6 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { UploadCloud, FileText, CheckCircle, Star, AlertTriangle, Loader2 } from 'lucide-react';
 import { reviewResumeQuality, ResumeReviewResult } from '../services/geminiService';
+import * as pdfjsLib from 'pdfjs-dist';
+
+// Handle ESM/CJS interop for PDF.js to safely get the library object
+// This fixes the "Cannot set properties of undefined (setting 'workerSrc')" error
+const pdfjs: any = (pdfjsLib as any).default || pdfjsLib;
+
+// Initialize PDF.js worker
+if (pdfjs.GlobalWorkerOptions) {
+    pdfjs.GlobalWorkerOptions.workerSrc = 'https://esm.sh/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+}
 
 interface ResumeUploadProps {
   onUpload: (text: string) => void;
@@ -12,10 +22,17 @@ export const ResumeUpload: React.FC<ResumeUploadProps> = ({ onUpload, currentRes
   const [isDragOver, setIsDragOver] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
+  const [isProcessingFile, setIsProcessingFile] = useState(false);
   
   // Review State
   const [isReviewing, setIsReviewing] = useState(false);
   const [reviewResult, setReviewResult] = useState<ResumeReviewResult | null>(null);
+
+  useEffect(() => {
+    if (currentResumeText) {
+        setText(currentResumeText);
+    }
+  }, [currentResumeText]);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -26,25 +43,61 @@ export const ResumeUpload: React.FC<ResumeUploadProps> = ({ onUpload, currentRes
     setIsDragOver(false);
   };
 
-  const processFile = (file: File) => {
+  const extractTextFromPdf = async (file: File): Promise<string> => {
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      
+      // Load the document using PDF.js
+      // We explicitly provide the cMapUrl to ensure fonts are parsed correctly
+      const loadingTask = pdfjs.getDocument({ 
+        data: arrayBuffer,
+        cMapUrl: 'https://esm.sh/pdfjs-dist@3.11.174/cmaps/',
+        cMapPacked: true,
+      });
+
+      const pdf = await loadingTask.promise;
+      
+      let fullText = '';
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const textContent = await page.getTextContent();
+        // In v3.x, items have a 'str' property containing the text
+        const pageText = textContent.items.map((item: any) => item.str || '').join(' ');
+        fullText += pageText + '\n\n';
+      }
+      return fullText;
+    } catch (error) {
+      console.error("Error parsing PDF:", error);
+      throw new Error("Failed to extract text. The PDF might be image-based or password protected.");
+    }
+  };
+
+  const processFile = async (file: File) => {
     setFileName(file.name);
+    setIsProcessingFile(true);
     
-    // Simulate PDF parsing for demo purposes (actual PDF parsing needs heavy libraries)
-    if (file.type === 'application/pdf') {
-        // In a real app, use pdfjs-dist here.
-        // For this demo, we mock the extraction or prompt the user.
-        alert("PDF Uploaded! In this demo environment, we cannot extract text from PDFs locally. Please ensure the text below represents your resume.");
-        if (text.length < 50) {
-            setText(`[Simulated Content from ${file.name}]\n\nExperienced Professional with skills in...\n(Please paste actual content for accurate AI results)`);
-        }
-    } else if (file.type === 'text/plain') {
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-            if (ev.target?.result) {
-                setText(ev.target.result as string);
+    try {
+        if (file.type === 'application/pdf') {
+            const extractedText = await extractTextFromPdf(file);
+            if (!extractedText.trim()) {
+                throw new Error("No text found in PDF. It might be scanned/image-based.");
             }
-        };
-        reader.readAsText(file);
+            setText(extractedText);
+        } else if (file.type === 'text/plain') {
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                if (ev.target?.result) {
+                    setText(ev.target.result as string);
+                }
+            };
+            reader.readAsText(file);
+        } else {
+            alert("Please upload a PDF or .txt file.");
+        }
+    } catch (err: any) {
+        alert(err.message || "Error processing file.");
+    } finally {
+        setIsProcessingFile(false);
     }
   };
 
@@ -52,12 +105,12 @@ export const ResumeUpload: React.FC<ResumeUploadProps> = ({ onUpload, currentRes
     e.preventDefault();
     setIsDragOver(false);
     const file = e.dataTransfer.files[0];
-    if (file) processFile(file);
+    if (file) await processFile(file);
   };
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
       if (e.target.files && e.target.files[0]) {
-          processFile(e.target.files[0]);
+          await processFile(e.target.files[0]);
       }
   };
 
@@ -93,16 +146,25 @@ export const ResumeUpload: React.FC<ResumeUploadProps> = ({ onUpload, currentRes
                 onDrop={handleDrop}
                 onClick={() => document.getElementById('resume-file-input')?.click()}
             >
-                <UploadCloud size={48} className="text-secondary mb-2" />
-                <p className="mb-1 fw-medium text-dark">
-                    {fileName ? `Selected: ${fileName}` : "Drag & drop PDF or Text file"}
-                </p>
-                <p className="small text-secondary mb-0">or click to browse</p>
+                {isProcessingFile ? (
+                    <div className="d-flex flex-column align-items-center justify-content-center py-2">
+                        <Loader2 size={32} className="text-primary-custom animate-spin mb-2" />
+                        <p className="mb-0 text-secondary small">Extracting text...</p>
+                    </div>
+                ) : (
+                    <>
+                        <UploadCloud size={48} className="text-secondary mb-2" />
+                        <p className="mb-1 fw-medium text-dark">
+                            {fileName ? `Selected: ${fileName}` : "Drag & drop PDF or Text file"}
+                        </p>
+                        <p className="small text-secondary mb-0">or click to browse</p>
+                    </>
+                )}
                 <input 
                     type="file" 
                     id="resume-file-input" 
                     className="d-none" 
-                    accept=".pdf,.txt,.doc,.docx"
+                    accept=".pdf,.txt"
                     onChange={handleFileSelect}
                 />
             </div>
@@ -110,7 +172,7 @@ export const ResumeUpload: React.FC<ResumeUploadProps> = ({ onUpload, currentRes
             <div className="mb-3">
                 <label className="form-label small fw-bold text-secondary d-flex align-items-center">
                     <FileText size={14} className="me-1" />
-                    Resume Text (Editable)
+                    Resume Text {fileName ? '(Extracted)' : '(Editable)'}
                 </label>
                 <textarea
                     className="form-control"
@@ -124,6 +186,7 @@ export const ResumeUpload: React.FC<ResumeUploadProps> = ({ onUpload, currentRes
             <button 
                 onClick={handleSave}
                 className={`btn w-100 d-flex align-items-center justify-content-center ${isSaved ? 'btn-success text-white' : 'btn-primary-custom'}`}
+                disabled={isProcessingFile}
             >
                 {isSaved ? (
                     <>

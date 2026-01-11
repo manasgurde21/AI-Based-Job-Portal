@@ -23,7 +23,15 @@ const AppContent: React.FC = () => {
 
   // Load initial data
   useEffect(() => {
-    refreshData();
+    const initData = async () => {
+      try {
+        await refreshData();
+      } catch (error) {
+        console.error("Failed to fetch initial data", error);
+        setLoading(false);
+      }
+    };
+    initData();
   }, []);
 
   useEffect(() => {
