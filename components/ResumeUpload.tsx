@@ -4,12 +4,13 @@ import { reviewResumeQuality, ResumeReviewResult } from '../services/geminiServi
 import * as pdfjsLib from 'pdfjs-dist';
 
 // Handle ESM/CJS interop for PDF.js to safely get the library object
-// This fixes the "Cannot set properties of undefined (setting 'workerSrc')" error
 const pdfjs: any = (pdfjsLib as any).default || pdfjsLib;
 
 // Initialize PDF.js worker
+// We use cdn.jsdelivr.net because it serves the 'classic' script format required for workers,
+// whereas esm.sh serves ES modules which can cause 'importScripts' errors in some environments.
 if (pdfjs.GlobalWorkerOptions) {
-    pdfjs.GlobalWorkerOptions.workerSrc = 'https://esm.sh/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+    pdfjs.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
 }
 
 interface ResumeUploadProps {
@@ -49,9 +50,10 @@ export const ResumeUpload: React.FC<ResumeUploadProps> = ({ onUpload, currentRes
       
       // Load the document using PDF.js
       // We explicitly provide the cMapUrl to ensure fonts are parsed correctly
+      // Using the same CDN version as the worker for consistency
       const loadingTask = pdfjs.getDocument({ 
         data: arrayBuffer,
-        cMapUrl: 'https://esm.sh/pdfjs-dist@3.11.174/cmaps/',
+        cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/cmaps/',
         cMapPacked: true,
       });
 
