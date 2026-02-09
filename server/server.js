@@ -7,13 +7,19 @@ const PORT = 5000;
 
 // Middleware
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' })); // Increased limit for resume text
 
 // Database Connection
-// Connects to your local MongoDB instance
-mongoose.connect('mongodb://localhost:27017/hiresense')
-  .then(() => console.log('✅ Connected to MongoDB'))
-  .catch(err => console.error('❌ MongoDB Connection Error:', err));
+// We use the credentials provided. 
+// NOTE: Ensure your IP is whitelisted in MongoDB Atlas Network Access.
+const CONNECTION_STRING = 'mongodb+srv://manasgurde45_db_user:tiHDD5NL8CuzINrK@cluster0.6siaz2n.mongodb.net/hiresense?retryWrites=true&w=majority&appName=Cluster0';
+
+mongoose.connect(CONNECTION_STRING)
+  .then(() => console.log('✅ Connected to MongoDB Atlas (Database: hiresense)'))
+  .catch(err => {
+      console.error('❌ MongoDB Connection Error:', err);
+      console.log('HINT: Check if your IP address is allowed in MongoDB Atlas "Network Access" settings.');
+  });
 
 // --- Schemas & Models ---
 
@@ -21,7 +27,7 @@ const UserSchema = new mongoose.Schema({
   id: String,
   name: String,
   email: { type: String, unique: true },
-  password: String, // Note: In production, use bcrypt to hash passwords
+  password: String,
   role: String,
   resumeText: String,
   title: String,
@@ -58,6 +64,20 @@ const Job = mongoose.model('Job', JobSchema);
 const Application = mongoose.model('Application', ApplicationSchema);
 
 // --- API Routes ---
+
+// Health Check
+app.get('/', (req, res) => {
+    res.send('<h1>HireSense Backend is Running 🚀</h1><p>Connected to MongoDB Atlas</p>');
+});
+
+app.get('/api/health', (req, res) => {
+    // Check mongo connection state: 1 = connected
+    const isDbConnected = mongoose.connection.readyState === 1;
+    res.json({ 
+        status: 'ok', 
+        database: isDbConnected ? 'connected' : 'disconnected' 
+    });
+});
 
 // Auth
 app.post('/api/auth/register', async (req, res) => {
@@ -144,6 +164,14 @@ app.get('/api/applications', async (req, res) => {
 
 app.post('/api/applications', async (req, res) => {
   try {
+    const { jobId, userId } = req.body;
+    
+    // Check for existing application
+    const existing = await Application.findOne({ jobId, userId });
+    if (existing) {
+        return res.status(400).json({ error: 'Already applied' });
+    }
+
     const newApp = new Application({
       ...req.body,
       id: 'a' + Date.now().toString(),

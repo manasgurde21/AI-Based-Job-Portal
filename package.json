@@ -4,9 +4,10 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "concurrently \"npm run server\" \"vite\"",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "server": "cd server && npm install && node server.js"
   },
   "dependencies": {
     "@google/genai": "^1.35.0",
@@ -23,6 +24,7 @@
     "@types/react": "^19.2.3",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^4.2.1",
+    "concurrently": "^8.2.2",
     "typescript": "^5.2.2",
     "vite": "^5.0.0"
   }
