@@ -10,8 +10,7 @@ import { RegisterPage } from './pages/RegisterPage';
 import { PostJobPage } from './pages/PostJobPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { User, Application, Job } from './types';
-import { getCurrentUser, getJobs, getApplications, logoutUser, updateUserResume, createApplication, checkBackendHealth } from './services/database';
-import { WifiOff, RefreshCw } from 'lucide-react';
+import { getCurrentUser, getJobs, getApplications, logoutUser, updateUserResume, createApplication } from './services/database';
 
 const AppContent: React.FC = () => {
   const navigate = useNavigate();
@@ -21,7 +20,6 @@ const AppContent: React.FC = () => {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
-  const [backendError, setBackendError] = useState(false);
 
   // Load initial data
   useEffect(() => {
@@ -37,14 +35,6 @@ const AppContent: React.FC = () => {
 
   const refreshData = async () => {
     setLoading(true);
-    setBackendError(false);
-
-    const isHealthy = await checkBackendHealth();
-    if (!isHealthy) {
-        setBackendError(true);
-        setLoading(false);
-        return;
-    }
 
     setCurrentUser(getCurrentUser());
     try {
@@ -101,18 +91,7 @@ const AppContent: React.FC = () => {
         navigate={navigate} 
       />
       
-      {backendError && (
-          <div className="bg-danger text-white p-3 text-center d-flex align-items-center justify-content-center">
-              <WifiOff className="me-2" size={20} />
-              <span className="fw-bold me-3">Cannot connect to Backend Server.</span>
-              <span className="small me-3">Please ensure 'node server/server.js' is running.</span>
-              <button onClick={refreshData} className="btn btn-sm btn-outline-light d-flex align-items-center">
-                  <RefreshCw size={14} className="me-1" /> Retry
-              </button>
-          </div>
-      )}
-
-      {loading && jobs.length === 0 && !backendError ? (
+      {loading && jobs.length === 0 ? (
           <div className="d-flex justify-content-center align-items-center vh-100">
               <div className="spinner-border text-primary-custom" role="status">
                   <span className="visually-hidden">Loading...</span>
@@ -143,7 +122,7 @@ const AppContent: React.FC = () => {
                             applications={applications} 
                             onUpdateResume={handleUpdateResume}
                             navigate={navigate}
-                            onDataChange={refreshData}
+                            onDataChange={() => refreshData()}
                         />
                     ) : (
                         <Navigate to="/login" replace />
@@ -157,7 +136,7 @@ const AppContent: React.FC = () => {
                         <ProfilePage 
                             currentUser={currentUser} 
                             navigate={navigate}
-                            onProfileUpdate={refreshData}
+                            onProfileUpdate={() => refreshData()}
                         />
                     ) : (
                         <Navigate to="/login" replace />

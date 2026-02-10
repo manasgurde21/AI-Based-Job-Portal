@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { loginUser } from '../services/database';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Sparkles } from 'lucide-react';
 
 interface LoginPageProps {
   onLoginSuccess: () => void;
@@ -33,16 +33,26 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, navigate }
   };
 
   return (
-    <div className="container py-5 d-flex justify-content-center align-items-center" style={{ minHeight: '80vh' }}>
-      <div className="card shadow-lg p-4" style={{ maxWidth: '400px', width: '100%' }}>
+    <div className="container d-flex justify-content-center align-items-center" style={{ minHeight: '85vh' }}>
+      <div className="card border-0 shadow-lg p-4 glass-card" style={{ maxWidth: '420px', width: '100%' }}>
+        
+        {/* Decorative Top Accent */}
+        <div className="position-absolute top-0 start-0 w-100 bg-gradient-custom rounded-top" style={{height: '6px'}}></div>
+
         <div className="card-body">
-          <h2 className="text-center fw-bold text-primary-custom mb-4">Login</h2>
+          <div className="text-center mb-4">
+             <div className="d-inline-flex align-items-center justify-content-center bg-primary-custom text-white rounded-circle mb-3 shadow-sm" style={{width: 48, height: 48}}>
+                <Sparkles size={24} />
+             </div>
+             <h3 className="fw-bold text-dark mb-1">Welcome Back</h3>
+             <p className="text-secondary small">Login to access your personalized dashboard</p>
+          </div>
           
-          {error && <div className="alert alert-danger">{error}</div>}
+          {error && <div className="alert alert-danger border-0 bg-danger bg-opacity-10 text-danger rounded-xl mb-4">{error}</div>}
 
           <form onSubmit={handleSubmit}>
             <div className="mb-3">
-              <label className="form-label">Email Address</label>
+              <label className="form-label small fw-bold text-secondary text-uppercase">Email Address</label>
               <input 
                 type="email" 
                 className="form-control" 
@@ -53,25 +63,25 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, navigate }
               />
             </div>
             <div className="mb-4">
-              <label className="form-label">Password</label>
+              <label className="form-label small fw-bold text-secondary text-uppercase">Password</label>
               <input 
                 type="password" 
                 className="form-control" 
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required 
-                placeholder="password123"
+                placeholder="••••••••"
               />
             </div>
-            <button type="submit" disabled={loading} className="btn btn-primary-custom w-100 py-2 fw-bold d-flex justify-content-center align-items-center">
+            <button type="submit" disabled={loading} className="btn btn-primary-custom w-100 py-2 fw-bold d-flex justify-content-center align-items-center shadow-md">
                 {loading ? <Loader2 className="animate-spin me-2" size={18} /> : null}
-                Login
+                Sign In
             </button>
           </form>
 
-          <div className="mt-3 text-center">
-            <p className="small text-secondary">
-              Don't have an account? <button onClick={() => navigate('/register')} className="btn btn-link p-0 text-decoration-none">Register</button>
+          <div className="mt-4 text-center border-top pt-3">
+            <p className="small text-secondary mb-0">
+              New to HireSense? <button onClick={() => navigate('/register')} className="btn btn-link p-0 text-decoration-none fw-bold text-primary-custom">Create Account</button>
             </p>
           </div>
         </div>

@@ -1,72 +1,81 @@
-import { User, Job, Application } from '../types';
+import { User, Job, Application, UserRole } from '../types';
+import { MOCK_JOBS, MOCK_APPLICATIONS, MOCK_USER, MOCK_RECRUITER } from '../constants';
 
-// We use a relative URL now. Vite proxy (configured in vite.config.ts) will forward 
-// requests starting with /api to http://localhost:5000/api
-const API_URL = '/api';
+// --- MOCK DATABASE IMPLEMENTATION (LocalStorage) ---
 
 const KEYS = {
-  SESSION: 'tm_session'
+  USERS: 'hs_users',
+  JOBS: 'hs_jobs',
+  APPLICATIONS: 'hs_applications',
+  SESSION: 'hs_session'
 };
 
-// --- Helper for API Calls ---
-async function apiCall<T>(endpoint: string, options?: RequestInit): Promise<T> {
-    try {
-        const response = await fetch(`${API_URL}${endpoint}`, {
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            ...options,
-        });
-
-        if (!response.ok) {
-            throw new Error(`API Error: ${response.statusText}`);
-        }
-        return await response.json();
-    } catch (error) {
-        throw error; // Re-throw to handle in UI
+// Initialize Mock Data if empty
+const initializeMockData = () => {
+    if (!localStorage.getItem(KEYS.JOBS)) {
+        localStorage.setItem(KEYS.JOBS, JSON.stringify(MOCK_JOBS));
     }
-}
+    if (!localStorage.getItem(KEYS.APPLICATIONS)) {
+        localStorage.setItem(KEYS.APPLICATIONS, JSON.stringify(MOCK_APPLICATIONS));
+    }
+    if (!localStorage.getItem(KEYS.USERS)) {
+        // Pre-populate with the mock users from constants.ts so you can login easily
+        const users = [MOCK_USER, MOCK_RECRUITER];
+        localStorage.setItem(KEYS.USERS, JSON.stringify(users));
+    }
+};
+
+// Run initialization immediately
+initializeMockData();
+
+// --- Helper Functions ---
+const getLocal = <T>(key: string): T[] => {
+    const data = localStorage.getItem(key);
+    return data ? JSON.parse(data) : [];
+};
+
+const setLocal = (key: string, data: any[]) => {
+    localStorage.setItem(key, JSON.stringify(data));
+};
 
 export const checkBackendHealth = async (): Promise<boolean> => {
-    try {
-        await apiCall('/health');
-        return true;
-    } catch (e) {
-        return false;
-    }
+    // Always true in mock mode
+    return true; 
 }
 
 // --- Auth Operations ---
 
 export const loginUser = async (email: string, password: string): Promise<User | null> => {
-    try {
-        const user = await apiCall<User>('/auth/login', {
-            method: 'POST',
-            body: JSON.stringify({ email, password })
-        });
-        
-        // Save session locally to keep user logged in on refresh
+    await new Promise(r => setTimeout(r, 500)); // Simulate delay
+    const users = getLocal<User>(KEYS.USERS);
+    // Simple mock login - in real app check password hash
+    const user = users.find(u => u.email === email);
+    
+    // For testing ease, if password is 'password', allow it, or match existing logic
+    if (user && (user.password === password || password === 'password' || password === '123456')) {
         localStorage.setItem(KEYS.SESSION, JSON.stringify(user));
         return user;
-    } catch (error) {
-        console.error("Login failed:", error);
-        return null;
     }
+    return null;
 };
 
 export const registerUser = async (userData: Omit<User, 'id'>): Promise<User | null> => {
-    try {
-        const user = await apiCall<User>('/auth/register', {
-            method: 'POST',
-            body: JSON.stringify(userData)
-        });
-        
-        localStorage.setItem(KEYS.SESSION, JSON.stringify(user));
-        return user;
-    } catch (error) {
-        console.error("Registration failed:", error);
-        return null;
+    await new Promise(r => setTimeout(r, 800)); // Simulate delay
+    const users = getLocal<User>(KEYS.USERS);
+    
+    if (users.find(u => u.email === userData.email)) {
+        return null; // User exists
     }
+
+    const newUser: User = {
+        ...userData,
+        id: 'u' + Date.now().toString()
+    };
+    
+    users.push(newUser);
+    setLocal(KEYS.USERS, users);
+    localStorage.setItem(KEYS.SESSION, JSON.stringify(newUser));
+    return newUser;
 };
 
 export const logoutUser = async (): Promise<void> => {
@@ -83,87 +92,85 @@ export const updateUserResume = async (userId: string, resumeText: string): Prom
 };
 
 export const updateUserProfile = async (userId: string, data: Partial<User>): Promise<User | null> => {
-    try {
-        const updatedUser = await apiCall<User>(`/users/${userId}`, {
-            method: 'PATCH',
-            body: JSON.stringify(data)
-        });
-
-        // Update local session if it matches the current user
+    const users = getLocal<User>(KEYS.USERS);
+    const index = users.findIndex(u => u.id === userId);
+    
+    if (index !== -1) {
+        const updatedUser = { ...users[index], ...data };
+        users[index] = updatedUser;
+        setLocal(KEYS.USERS, users);
+        
+        // Update session if it's the current user
         const currentUser = getCurrentUser();
         if (currentUser && currentUser.id === userId) {
             localStorage.setItem(KEYS.SESSION, JSON.stringify(updatedUser));
         }
         return updatedUser;
-    } catch (error) {
-        console.error("Update profile failed:", error);
-        return null;
     }
+    return null;
 };
 
 // --- Job Operations ---
 
 export const getJobs = async (): Promise<Job[]> => {
-  try {
-      return await apiCall<Job[]>('/jobs');
-  } catch (error) {
-      console.error("Fetch jobs failed:", error);
-      // We return empty array here but component will check health separately
-      return [];
-  }
+  // Simulate network delay
+  await new Promise(r => setTimeout(r, 300));
+  return getLocal<Job>(KEYS.JOBS);
 };
 
 export const getJobById = async (id: string): Promise<Job | undefined> => {
-    try {
-        return await apiCall<Job>(`/jobs/${id}`);
-    } catch (error) {
-        console.error("Fetch job failed:", error);
-        return undefined;
-    }
+    const jobs = getLocal<Job>(KEYS.JOBS);
+    return jobs.find(j => j.id === id);
 };
 
 export const createJob = async (jobData: Omit<Job, 'id' | 'postedDate'>): Promise<Job | null> => {
-  try {
-      return await apiCall<Job>('/jobs', {
-          method: 'POST',
-          body: JSON.stringify(jobData)
-      });
-  } catch (error) {
-      console.error("Create job failed:", error);
-      return null;
-  }
+    await new Promise(r => setTimeout(r, 600));
+    const jobs = getLocal<Job>(KEYS.JOBS);
+    
+    const newJob: Job = {
+        ...jobData,
+        id: 'j' + Date.now().toString(),
+        postedDate: new Date().toISOString()
+    };
+    
+    jobs.unshift(newJob); // Add to beginning
+    setLocal(KEYS.JOBS, jobs);
+    return newJob;
 };
 
 // --- Application Operations ---
 
 export const getApplications = async (): Promise<Application[]> => {
-  try {
-      return await apiCall<Application[]>('/applications');
-  } catch (error) {
-      console.error("Fetch applications failed:", error);
-      return [];
-  }
+  await new Promise(r => setTimeout(r, 300));
+  return getLocal<Application>(KEYS.APPLICATIONS);
 };
 
 export const createApplication = async (appData: Omit<Application, 'id' | 'appliedDate' | 'status'>): Promise<Application | null> => {
-  try {
-      return await apiCall<Application>('/applications', {
-          method: 'POST',
-          body: JSON.stringify(appData)
-      });
-  } catch (error) {
-      console.error("Create application failed:", error);
-      return null;
-  }
+    await new Promise(r => setTimeout(r, 600));
+    const apps = getLocal<Application>(KEYS.APPLICATIONS);
+    
+    if (apps.find(a => a.jobId === appData.jobId && a.userId === appData.userId)) {
+        throw new Error("Already applied");
+    }
+
+    const newApp: Application = {
+        ...appData,
+        id: 'a' + Date.now().toString(),
+        status: 'Applied',
+        appliedDate: new Date().toISOString().split('T')[0]
+    };
+    
+    apps.push(newApp);
+    setLocal(KEYS.APPLICATIONS, apps);
+    return newApp;
 };
 
 export const updateApplicationStatus = async (appId: string, status: Application['status']): Promise<void> => {
-    try {
-        await apiCall<Application>(`/applications/${appId}`, {
-            method: 'PATCH',
-            body: JSON.stringify({ status })
-        });
-    } catch (error) {
-        console.error("Update status failed:", error);
+    const apps = getLocal<Application>(KEYS.APPLICATIONS);
+    const index = apps.findIndex(a => a.id === appId);
+    
+    if (index !== -1) {
+        apps[index].status = status;
+        setLocal(KEYS.APPLICATIONS, apps);
     }
 };

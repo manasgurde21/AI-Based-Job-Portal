@@ -7,13 +7,7 @@ export default defineConfig({
     'process.env.API_KEY': JSON.stringify(process.env.API_KEY)
   },
   server: {
-    proxy: {
-      '/api': {
-        target: 'http://localhost:5000',
-        changeOrigin: true,
-        secure: false,
-      }
-    }
+    // Proxy removed for Mock Mode
   },
   build: {
     outDir: 'dist',

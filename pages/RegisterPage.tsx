@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { registerUser } from '../services/database';
 import { UserRole } from '../types';
-import { Loader2 } from 'lucide-react';
+import { Loader2, UserPlus } from 'lucide-react';
 
 interface RegisterPageProps {
   onLoginSuccess: () => void;
@@ -36,64 +36,85 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onLoginSuccess, navi
   };
 
   return (
-    <div className="container py-5 d-flex justify-content-center align-items-center" style={{ minHeight: '80vh' }}>
-      <div className="card shadow-lg p-4" style={{ maxWidth: '450px', width: '100%' }}>
+    <div className="container d-flex justify-content-center align-items-center" style={{ minHeight: '85vh' }}>
+      <div className="card border-0 shadow-lg p-4 glass-card" style={{ maxWidth: '480px', width: '100%' }}>
+        
+        {/* Decorative Top Accent */}
+        <div className="position-absolute top-0 start-0 w-100 bg-accent-color rounded-top" style={{height: '6px', background: 'var(--accent-color)'}}></div>
+
         <div className="card-body">
-          <h2 className="text-center fw-bold text-primary-custom mb-4">Create Account</h2>
+          <div className="text-center mb-4">
+             <div className="d-inline-flex align-items-center justify-content-center bg-light text-primary-custom rounded-circle mb-3 shadow-sm" style={{width: 50, height: 50}}>
+                <UserPlus size={24} />
+             </div>
+             <h3 className="fw-bold text-dark mb-1">Join HireSense</h3>
+             <p className="text-secondary small">Start your intelligent job search journey</p>
+          </div>
           
-          {error && <div className="alert alert-danger">{error}</div>}
+          {error && <div className="alert alert-danger border-0 bg-danger bg-opacity-10 text-danger rounded-xl mb-4">{error}</div>}
 
           <form onSubmit={handleSubmit}>
-            <div className="mb-3">
-              <label className="form-label">Full Name</label>
-              <input 
-                type="text" 
-                className="form-control" 
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required 
-              />
+            <div className="row g-3">
+                <div className="col-12">
+                    <label className="form-label small fw-bold text-secondary text-uppercase">Full Name</label>
+                    <input 
+                        type="text" 
+                        className="form-control" 
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        required 
+                    />
+                </div>
+                <div className="col-12">
+                    <label className="form-label small fw-bold text-secondary text-uppercase">Email Address</label>
+                    <input 
+                        type="email" 
+                        className="form-control" 
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        required 
+                    />
+                </div>
+                <div className="col-12">
+                    <label className="form-label small fw-bold text-secondary text-uppercase">Password</label>
+                    <input 
+                        type="password" 
+                        className="form-control" 
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        required 
+                    />
+                </div>
+                <div className="col-12 mb-2">
+                    <label className="form-label small fw-bold text-secondary text-uppercase">I want to...</label>
+                    <div className="d-flex gap-2">
+                        <div 
+                            className={`flex-fill border rounded-xl p-3 cursor-pointer text-center transition-all ${role === UserRole.JOB_SEEKER ? 'border-primary bg-primary bg-opacity-10' : 'bg-light border-light'}`}
+                            onClick={() => setRole(UserRole.JOB_SEEKER)}
+                            style={{cursor: 'pointer'}}
+                        >
+                            <span className={`fw-bold d-block ${role === UserRole.JOB_SEEKER ? 'text-primary-custom' : 'text-secondary'}`}>Find Jobs</span>
+                        </div>
+                        <div 
+                            className={`flex-fill border rounded-xl p-3 cursor-pointer text-center transition-all ${role === UserRole.RECRUITER ? 'border-primary bg-primary bg-opacity-10' : 'bg-light border-light'}`}
+                            onClick={() => setRole(UserRole.RECRUITER)}
+                            style={{cursor: 'pointer'}}
+                        >
+                            <span className={`fw-bold d-block ${role === UserRole.RECRUITER ? 'text-primary-custom' : 'text-secondary'}`}>Hire Talent</span>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div className="mb-3">
-              <label className="form-label">Email Address</label>
-              <input 
-                type="email" 
-                className="form-control" 
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required 
-              />
-            </div>
-            <div className="mb-3">
-              <label className="form-label">Password</label>
-              <input 
-                type="password" 
-                className="form-control" 
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required 
-              />
-            </div>
-            <div className="mb-4">
-              <label className="form-label">I am a...</label>
-              <select 
-                className="form-select"
-                value={role}
-                onChange={(e) => setRole(e.target.value as UserRole)}
-              >
-                <option value={UserRole.JOB_SEEKER}>Job Seeker</option>
-                <option value={UserRole.RECRUITER}>Recruiter</option>
-              </select>
-            </div>
-            <button type="submit" disabled={loading} className="btn btn-accent-custom w-100 py-2 fw-bold d-flex justify-content-center align-items-center">
+
+            <button type="submit" disabled={loading} className="btn btn-primary-custom w-100 py-3 mt-3 fw-bold d-flex justify-content-center align-items-center shadow-md">
                 {loading ? <Loader2 className="animate-spin me-2" size={18} /> : null}
-                Register
+                Create Account
             </button>
           </form>
 
-          <div className="mt-3 text-center">
-            <p className="small text-secondary">
-              Already have an account? <button onClick={() => navigate('/login')} className="btn btn-link p-0 text-decoration-none">Login</button>
+          <div className="mt-4 text-center border-top pt-3">
+            <p className="small text-secondary mb-0">
+              Already have an account? <button onClick={() => navigate('/login')} className="btn btn-link p-0 text-decoration-none fw-bold text-primary-custom">Login</button>
             </p>
           </div>
         </div>
