@@ -10,7 +10,9 @@ import { RegisterPage } from './pages/RegisterPage';
 import { PostJobPage } from './pages/PostJobPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { User, Application, Job } from './types';
-import { getCurrentUser, getJobs, getApplications, logoutUser, updateUserResume, createApplication } from './services/database';
+import { getCurrentUser, getJobs, getApplications, getAllUsers, logoutUser, updateUserResume, createApplication } from './services/database';
+import { analyzeResumeMatch } from './services/geminiService';
+import { Loader2 } from 'lucide-react';
 
 const AppContent: React.FC = () => {
   const navigate = useNavigate();
@@ -19,7 +21,9 @@ const AppContent: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
+  const [allUsers, setAllUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isApplying, setIsApplying] = useState(false);
 
   // Load initial data
   useEffect(() => {
@@ -38,12 +42,14 @@ const AppContent: React.FC = () => {
 
     setCurrentUser(getCurrentUser());
     try {
-        const [fetchedJobs, fetchedApps] = await Promise.all([
+        const [fetchedJobs, fetchedApps, fetchedUsers] = await Promise.all([
             getJobs(),
-            getApplications()
+            getApplications(),
+            getAllUsers()
         ]);
         setJobs(fetchedJobs);
         setApplications(fetchedApps);
+        setAllUsers(fetchedUsers);
     } catch (e) {
         console.error("Error fetching data:", e);
     }
@@ -72,15 +78,36 @@ const AppContent: React.FC = () => {
           navigate('/login');
           return;
       }
+
+      if (!currentUser.resumeText || currentUser.resumeText.length < 50) {
+          const confirmRedirect = window.confirm("You need a resume to apply and get an AI Match Score. Go to Dashboard to upload one?");
+          if (confirmRedirect) navigate('/dashboard');
+          return;
+      }
+      
+      setIsApplying(true);
+      let matchScore = 0;
+
+      try {
+          // Calculate Match Score immediately
+          const job = jobs.find(j => j.id === jobId);
+          if (job) {
+             const result = await analyzeResumeMatch(currentUser.resumeText, job.description + " " + job.requirements.join(", "));
+             matchScore = result.score;
+          }
+      } catch (error) {
+          console.error("AI scoring failed, proceeding with default score", error);
+      }
       
       await createApplication({
           jobId,
           userId: currentUser.id,
-          matchScore: 0 
+          matchScore: matchScore 
       });
       
+      setIsApplying(false);
       await refreshData();
-      alert("Application sent successfully!");
+      alert(`Application sent successfully! AI Match Score: ${matchScore}%`);
   };
 
   return (
@@ -98,7 +125,15 @@ const AppContent: React.FC = () => {
               </div>
           </div>
       ) : (
-        <div className="flex-grow-1">
+        <div className="flex-grow-1 position-relative">
+            {isApplying && (
+                <div className="position-fixed top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center" style={{backgroundColor: 'rgba(255,255,255,0.8)', zIndex: 2000}}>
+                    <div className="text-center">
+                        <Loader2 className="animate-spin text-primary-custom mb-2" size={48} />
+                        <h5 className="fw-bold">Analyzing Resume & Applying...</h5>
+                    </div>
+                </div>
+            )}
             <Routes>
             <Route path="/" element={<HomePage navigate={navigate} />} />
             <Route path="/jobs" element={<JobListingPage jobs={jobs} navigate={navigate} />} />
@@ -119,7 +154,8 @@ const AppContent: React.FC = () => {
                         <DashboardPage 
                             user={currentUser} 
                             jobs={jobs}
-                            applications={applications} 
+                            applications={applications}
+                            allUsers={allUsers}
                             onUpdateResume={handleUpdateResume}
                             navigate={navigate}
                             onDataChange={() => refreshData()}
@@ -151,7 +187,6 @@ const AppContent: React.FC = () => {
                             currentUser={currentUser}
                             onJobPosted={async () => {
                                 await refreshData();
-                                navigate('/dashboard');
                             }}
                             navigate={navigate}
                         />

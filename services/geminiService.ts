@@ -1,5 +1,6 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
-import { MatchResult } from '../types';
+import { MatchResult, Job } from '../types';
 
 const getAiClient = () => {
   // Assuming process.env.API_KEY is available as per instructions
@@ -122,4 +123,54 @@ export const reviewResumeQuality = async (resumeText: string): Promise<ResumeRev
           improvements: ["Check API connection"]
       };
     }
-  };
+};
+
+// New function for AI Recommendations
+export const recommendJobsBasedOnResume = async (resumeText: string, availableJobs: Job[]): Promise<string[]> => {
+    const ai = getAiClient();
+
+    // Create a simplified version of jobs to save tokens
+    const jobsSummary = availableJobs.map(j => ({
+        id: j.id,
+        title: j.title,
+        company: j.company,
+        requirements: j.requirements.join(", ")
+    }));
+
+    const prompt = `
+        You are a smart recruiter. 
+        Given the Resume Text below, select the top 3 Job IDs from the provided list that best match the candidate's profile.
+        
+        Resume:
+        ${resumeText.substring(0, 3000)} // Truncate to avoid token limits if very long
+
+        Available Jobs (JSON):
+        ${JSON.stringify(jobsSummary)}
+
+        Return strictly a JSON array of strings containing the 'id' of the recommended jobs. 
+        If no strong matches found, return the ones that are closest or an empty array.
+    `;
+
+    try {
+        const response = await ai.models.generateContent({
+            model: 'gemini-3-flash-preview',
+            contents: prompt,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: Type.ARRAY,
+                    items: { type: Type.STRING },
+                    description: "Array of matching Job IDs"
+                }
+            }
+        });
+
+        const text = response.text;
+        if (!text) return [];
+        return JSON.parse(text) as string[];
+
+    } catch (error) {
+        console.error("AI Recommendation Failed", error);
+        return [];
+    }
+};

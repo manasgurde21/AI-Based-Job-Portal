@@ -1,90 +1,92 @@
 import { User, Job, Application, UserRole } from '../types';
-import { MOCK_JOBS, MOCK_APPLICATIONS, MOCK_USER, MOCK_RECRUITER } from '../constants';
+import { MOCK_USER, MOCK_JOBS, MOCK_APPLICATIONS, MOCK_RECRUITER } from '../constants';
 
-// --- MOCK DATABASE IMPLEMENTATION (LocalStorage) ---
+const SESSION_KEY = 'hs_session';
+const STORAGE_PREFIX = 'hs_db_';
 
-const KEYS = {
-  USERS: 'hs_users',
-  JOBS: 'hs_jobs',
-  APPLICATIONS: 'hs_applications',
-  SESSION: 'hs_session'
-};
+// --- Helpers ---
 
-// Initialize Mock Data if empty
-const initializeMockData = () => {
-    if (!localStorage.getItem(KEYS.JOBS)) {
-        localStorage.setItem(KEYS.JOBS, JSON.stringify(MOCK_JOBS));
-    }
-    if (!localStorage.getItem(KEYS.APPLICATIONS)) {
-        localStorage.setItem(KEYS.APPLICATIONS, JSON.stringify(MOCK_APPLICATIONS));
-    }
-    if (!localStorage.getItem(KEYS.USERS)) {
-        // Pre-populate with the mock users from constants.ts so you can login easily
-        const users = [MOCK_USER, MOCK_RECRUITER];
-        localStorage.setItem(KEYS.USERS, JSON.stringify(users));
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+const getStorage = <T>(key: string, defaultVal: T): T => {
+    try {
+        const item = localStorage.getItem(STORAGE_PREFIX + key);
+        return item ? JSON.parse(item) : defaultVal;
+    } catch {
+        return defaultVal;
     }
 };
 
-// Run initialization immediately
-initializeMockData();
-
-// --- Helper Functions ---
-const getLocal = <T>(key: string): T[] => {
-    const data = localStorage.getItem(key);
-    return data ? JSON.parse(data) : [];
+const setStorage = (key: string, value: any) => {
+    localStorage.setItem(STORAGE_PREFIX + key, JSON.stringify(value));
 };
 
-const setLocal = (key: string, data: any[]) => {
-    localStorage.setItem(key, JSON.stringify(data));
-};
-
-export const checkBackendHealth = async (): Promise<boolean> => {
-    // Always true in mock mode
-    return true; 
+// Initialize DB with Mock Data if empty
+if (!localStorage.getItem(STORAGE_PREFIX + 'jobs')) {
+    setStorage('jobs', MOCK_JOBS);
+}
+if (!localStorage.getItem(STORAGE_PREFIX + 'applications')) {
+    setStorage('applications', MOCK_APPLICATIONS);
+}
+if (!localStorage.getItem(STORAGE_PREFIX + 'users')) {
+    setStorage('users', [MOCK_USER, MOCK_RECRUITER]);
 }
 
-// --- Auth Operations ---
+// --- Auth ---
+
+export const checkBackendHealth = async (): Promise<boolean> => {
+    return true; // Always true in mock mode
+};
 
 export const loginUser = async (email: string, password: string): Promise<User | null> => {
-    await new Promise(r => setTimeout(r, 500)); // Simulate delay
-    const users = getLocal<User>(KEYS.USERS);
-    // Simple mock login - in real app check password hash
+    await delay(500); // Simulate network latency
+    
+    // Check hardcoded mocks first for easy access
+    if (email === MOCK_USER.email) return MOCK_USER;
+    if (email === MOCK_RECRUITER.email) return MOCK_RECRUITER;
+
+    // Check registered users in local storage
+    const users = getStorage<User[]>('users', []);
     const user = users.find(u => u.email === email);
     
-    // For testing ease, if password is 'password', allow it, or match existing logic
-    if (user && (user.password === password || password === 'password' || password === '123456')) {
-        localStorage.setItem(KEYS.SESSION, JSON.stringify(user));
+    // In a real app we would check password hash, here we just check existence
+    if (user) {
+        localStorage.setItem(SESSION_KEY, JSON.stringify(user));
         return user;
     }
     return null;
 };
 
 export const registerUser = async (userData: Omit<User, 'id'>): Promise<User | null> => {
-    await new Promise(r => setTimeout(r, 800)); // Simulate delay
-    const users = getLocal<User>(KEYS.USERS);
+    await delay(500);
+    const users = getStorage<User[]>('users', []);
     
     if (users.find(u => u.email === userData.email)) {
         return null; // User exists
     }
 
-    const newUser: User = {
-        ...userData,
-        id: 'u' + Date.now().toString()
-    };
-    
+    const newUser: User = { ...userData, id: `u_${Date.now()}` };
     users.push(newUser);
-    setLocal(KEYS.USERS, users);
-    localStorage.setItem(KEYS.SESSION, JSON.stringify(newUser));
+    setStorage('users', users);
+    
+    localStorage.setItem(SESSION_KEY, JSON.stringify(newUser));
     return newUser;
 };
 
 export const logoutUser = async (): Promise<void> => {
-  localStorage.removeItem(KEYS.SESSION);
+  localStorage.removeItem(SESSION_KEY);
 };
 
 export const getCurrentUser = (): User | null => {
-  const session = localStorage.getItem(KEYS.SESSION);
+  const session = localStorage.getItem(SESSION_KEY);
   return session ? JSON.parse(session) : null;
+};
+
+// --- Users ---
+
+export const getAllUsers = async (): Promise<User[]> => {
+    await delay(200);
+    return getStorage<User[]>('users', [MOCK_USER, MOCK_RECRUITER]);
 };
 
 export const updateUserResume = async (userId: string, resumeText: string): Promise<User | null> => {
@@ -92,85 +94,84 @@ export const updateUserResume = async (userId: string, resumeText: string): Prom
 };
 
 export const updateUserProfile = async (userId: string, data: Partial<User>): Promise<User | null> => {
-    const users = getLocal<User>(KEYS.USERS);
+    await delay(300);
+    const users = getStorage<User[]>('users', []);
     const index = users.findIndex(u => u.id === userId);
     
     if (index !== -1) {
         const updatedUser = { ...users[index], ...data };
         users[index] = updatedUser;
-        setLocal(KEYS.USERS, users);
+        setStorage('users', users);
         
         // Update session if it's the current user
         const currentUser = getCurrentUser();
         if (currentUser && currentUser.id === userId) {
-            localStorage.setItem(KEYS.SESSION, JSON.stringify(updatedUser));
+            localStorage.setItem(SESSION_KEY, JSON.stringify(updatedUser));
         }
         return updatedUser;
     }
     return null;
 };
 
-// --- Job Operations ---
+// --- Jobs ---
 
 export const getJobs = async (): Promise<Job[]> => {
-  // Simulate network delay
-  await new Promise(r => setTimeout(r, 300));
-  return getLocal<Job>(KEYS.JOBS);
+    await delay(300);
+    return getStorage<Job[]>('jobs', MOCK_JOBS);
 };
 
 export const getJobById = async (id: string): Promise<Job | undefined> => {
-    const jobs = getLocal<Job>(KEYS.JOBS);
+    await delay(100);
+    const jobs = getStorage<Job[]>('jobs', MOCK_JOBS);
     return jobs.find(j => j.id === id);
 };
 
 export const createJob = async (jobData: Omit<Job, 'id' | 'postedDate'>): Promise<Job | null> => {
-    await new Promise(r => setTimeout(r, 600));
-    const jobs = getLocal<Job>(KEYS.JOBS);
+    await delay(800); // Increased delay to ensure write completes before UI reads
+    const jobs = getStorage<Job[]>('jobs', MOCK_JOBS);
     
     const newJob: Job = {
         ...jobData,
-        id: 'j' + Date.now().toString(),
+        id: `j_${Date.now()}`,
         postedDate: new Date().toISOString()
     };
     
-    jobs.unshift(newJob); // Add to beginning
-    setLocal(KEYS.JOBS, jobs);
+    setStorage('jobs', [newJob, ...jobs]);
     return newJob;
 };
 
-// --- Application Operations ---
+// --- Applications ---
 
 export const getApplications = async (): Promise<Application[]> => {
-  await new Promise(r => setTimeout(r, 300));
-  return getLocal<Application>(KEYS.APPLICATIONS);
+    await delay(300);
+    return getStorage<Application[]>('applications', MOCK_APPLICATIONS);
 };
 
 export const createApplication = async (appData: Omit<Application, 'id' | 'appliedDate' | 'status'>): Promise<Application | null> => {
-    await new Promise(r => setTimeout(r, 600));
-    const apps = getLocal<Application>(KEYS.APPLICATIONS);
+    await delay(500);
+    const apps = getStorage<Application[]>('applications', MOCK_APPLICATIONS);
     
+    // Check if already applied
     if (apps.find(a => a.jobId === appData.jobId && a.userId === appData.userId)) {
-        throw new Error("Already applied");
+        return null;
     }
 
     const newApp: Application = {
         ...appData,
-        id: 'a' + Date.now().toString(),
+        id: `a_${Date.now()}`,
         status: 'Applied',
         appliedDate: new Date().toISOString().split('T')[0]
     };
     
-    apps.push(newApp);
-    setLocal(KEYS.APPLICATIONS, apps);
+    setStorage('applications', [...apps, newApp]);
     return newApp;
 };
 
 export const updateApplicationStatus = async (appId: string, status: Application['status']): Promise<void> => {
-    const apps = getLocal<Application>(KEYS.APPLICATIONS);
-    const index = apps.findIndex(a => a.id === appId);
-    
-    if (index !== -1) {
-        apps[index].status = status;
-        setLocal(KEYS.APPLICATIONS, apps);
-    }
+    await delay(300);
+    const apps = getStorage<Application[]>('applications', MOCK_APPLICATIONS);
+    const updatedApps = apps.map(app => 
+        app.id === appId ? { ...app, status } : app
+    );
+    setStorage('applications', updatedApps);
 };

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { User } from '../types';
 import { createJob } from '../services/database';
-import { ArrowLeft, Loader2 } from 'lucide-react';
+import { ArrowLeft, Loader2, CheckCircle } from 'lucide-react';
 
 interface PostJobPageProps {
   currentUser: User;
@@ -18,25 +18,57 @@ export const PostJobPage: React.FC<PostJobPageProps> = ({ currentUser, onJobPost
   const [description, setDescription] = useState('');
   const [requirementsStr, setRequirementsStr] = useState('');
   const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     
-    await createJob({
-      title,
-      company,
-      location,
-      salary,
-      description,
-      type: type as any,
-      recruiterId: currentUser.id,
-      requirements: requirementsStr.split(',').map(s => s.trim()).filter(s => s.length > 0)
-    });
+    try {
+        await createJob({
+            title,
+            company,
+            location,
+            salary,
+            description,
+            type: type as any,
+            recruiterId: currentUser.id,
+            requirements: requirementsStr.split(',').map(s => s.trim()).filter(s => s.length > 0)
+        });
 
-    setLoading(false);
-    onJobPosted();
+        // Ensure database write catches up
+        setTimeout(() => {
+            setLoading(false);
+            setSuccess(true);
+            
+            // Trigger app refresh
+            onJobPosted();
+            
+            // Navigate after showing success message
+            setTimeout(() => {
+                navigate('/dashboard');
+            }, 1500);
+        }, 500);
+
+    } catch (error) {
+        setLoading(false);
+        alert("Failed to post job. Please try again.");
+    }
   };
+
+  if (success) {
+      return (
+          <div className="container py-5 d-flex justify-content-center align-items-center" style={{minHeight: '60vh'}}>
+              <div className="text-center animate-fade-in">
+                  <div className="mb-3 d-inline-flex align-items-center justify-content-center bg-success text-white rounded-circle shadow-lg" style={{width: 80, height: 80}}>
+                      <CheckCircle size={40} />
+                  </div>
+                  <h3 className="fw-bold mb-2">Job Posted Successfully!</h3>
+                  <p className="text-secondary">Redirecting to your dashboard...</p>
+              </div>
+          </div>
+      );
+  }
 
   return (
     <div className="container py-5">

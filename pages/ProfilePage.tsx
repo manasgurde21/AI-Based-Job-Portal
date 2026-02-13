@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useRef } from 'react';
 import { User } from '../types';
 import { updateUserProfile } from '../services/database';
-import { Loader2, Calendar } from 'lucide-react';
+import { Loader2, Calendar, Camera, User as UserIcon } from 'lucide-react';
 
 interface ProfilePageProps {
   currentUser: User;
@@ -13,6 +14,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser, navigate,
   const [formData, setFormData] = useState<Partial<User>>({});
   const [isSaved, setIsSaved] = useState(false);
   const [loading, setLoading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setFormData({
@@ -22,12 +24,25 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser, navigate,
         phoneNumber: currentUser.phoneNumber || '',
         address: currentUser.address || '',
         dob: currentUser.dob || '',
-        bio: currentUser.bio || ''
+        bio: currentUser.bio || '',
+        profilePicture: currentUser.profilePicture || ''
     });
   }, [currentUser]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
       setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+              const base64String = reader.result as string;
+              setFormData(prev => ({ ...prev, profilePicture: base64String }));
+          };
+          reader.readAsDataURL(file);
+      }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -51,6 +66,44 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser, navigate,
             {isSaved && <div className="alert alert-success">Profile updated successfully!</div>}
             
             <form onSubmit={handleSubmit}>
+                {/* Profile Picture Upload Section */}
+                <div className="d-flex justify-content-center mb-5">
+                    <div className="position-relative">
+                        <div 
+                            className="rounded-circle border border-3 border-light shadow-sm overflow-hidden d-flex align-items-center justify-content-center bg-light"
+                            style={{ width: '120px', height: '120px', cursor: 'pointer' }}
+                            onClick={() => fileInputRef.current?.click()}
+                        >
+                            {formData.profilePicture ? (
+                                <img 
+                                    src={formData.profilePicture} 
+                                    alt="Profile" 
+                                    className="w-100 h-100 object-fit-cover"
+                                />
+                            ) : (
+                                <div className="bg-gradient-custom text-white w-100 h-100 d-flex align-items-center justify-content-center display-4 fw-bold">
+                                    {formData.name?.charAt(0).toUpperCase() || <UserIcon size={48} />}
+                                </div>
+                            )}
+                        </div>
+                        <button 
+                            type="button"
+                            className="btn btn-sm btn-primary-custom rounded-circle position-absolute bottom-0 end-0 shadow-sm d-flex align-items-center justify-content-center"
+                            style={{ width: '36px', height: '36px' }}
+                            onClick={() => fileInputRef.current?.click()}
+                        >
+                            <Camera size={16} />
+                        </button>
+                        <input 
+                            type="file" 
+                            ref={fileInputRef} 
+                            className="d-none" 
+                            accept="image/*"
+                            onChange={handleImageUpload}
+                        />
+                    </div>
+                </div>
+
                 <div className="row g-3">
                     <div className="col-md-6">
                         <label className="form-label fw-bold">Full Name</label>

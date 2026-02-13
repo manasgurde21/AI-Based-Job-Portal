@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { User, UserRole } from '../types';
@@ -88,9 +89,18 @@ export const Navbar: React.FC<NavbarProps> = ({ currentUser, onLogout, navigate 
                         type="button" 
                         data-bs-toggle="dropdown"
                     >
-                         <div className="bg-gradient-custom text-white rounded-circle d-flex align-items-center justify-content-center me-2 fw-bold" style={{width: '32px', height: '32px', fontSize: '12px'}}>
-                            {currentUser.name.charAt(0)}
-                         </div>
+                         {currentUser.profilePicture ? (
+                             <img 
+                                src={currentUser.profilePicture} 
+                                alt="Profile" 
+                                className="rounded-circle me-2 object-fit-cover"
+                                style={{width: '32px', height: '32px'}}
+                             />
+                         ) : (
+                             <div className="bg-gradient-custom text-white rounded-circle d-flex align-items-center justify-content-center me-2 fw-bold" style={{width: '32px', height: '32px', fontSize: '12px'}}>
+                                {currentUser.name.charAt(0).toUpperCase()}
+                             </div>
+                         )}
                          <span className="fw-semibold small text-dark me-1">{currentUser.name.split(' ')[0]}</span>
                     </button>
                     <ul className="dropdown-menu dropdown-menu-end shadow-lg border-0 mt-3 p-2 rounded-3" style={{minWidth: '200px'}}>

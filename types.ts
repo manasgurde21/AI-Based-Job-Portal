@@ -1,3 +1,4 @@
+
 export enum UserRole {
   JOB_SEEKER = 'JOB_SEEKER',
   RECRUITER = 'RECRUITER'
@@ -15,6 +16,7 @@ export interface User {
   address?: string;
   dob?: string;
   bio?: string;
+  profilePicture?: string; // Base64 string for the image
 }
 
 export interface Job {

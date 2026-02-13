@@ -7,7 +7,7 @@ export default defineConfig({
     'process.env.API_KEY': JSON.stringify(process.env.API_KEY)
   },
   server: {
-    // Proxy removed for Mock Mode
+    // Proxy removed: Using local mock data service
   },
   build: {
     outDir: 'dist',
