@@ -41,18 +41,29 @@ const AppContent: React.FC = () => {
     setLoading(true);
 
     setCurrentUser(getCurrentUser());
+    
+    // Fetch data independently
     try {
-        const [fetchedJobs, fetchedApps, fetchedUsers] = await Promise.all([
-            getJobs(),
-            getApplications(),
-            getAllUsers()
-        ]);
-        setJobs(fetchedJobs);
-        setApplications(fetchedApps);
-        setAllUsers(fetchedUsers);
-    } catch (e) {
-        console.error("Error fetching data:", e);
+        const jobsData = await getJobs();
+        setJobs(jobsData);
+    } catch (e: any) {
+        console.error("Error fetching jobs:", e);
     }
+
+    try {
+        const appsData = await getApplications();
+        setApplications(appsData);
+    } catch (e: any) {
+        console.error("Error fetching applications:", e);
+    }
+
+    try {
+        const usersData = await getAllUsers();
+        setAllUsers(usersData);
+    } catch (e: any) {
+        console.error("Error fetching users:", e);
+    }
+
     setLoading(false);
   };
 
@@ -64,10 +75,14 @@ const AppContent: React.FC = () => {
 
   const handleUpdateResume = async (text: string) => {
     if (currentUser) {
-        const updatedUser = await updateUserResume(currentUser.id, text);
-        if (updatedUser) {
-            setCurrentUser(updatedUser);
-            alert("Resume updated successfully!");
+        try {
+            const updatedUser = await updateUserResume(currentUser.id, text);
+            if (updatedUser) {
+                setCurrentUser(updatedUser);
+                alert("Resume updated successfully!");
+            }
+        } catch (e) {
+            alert("Failed to update resume.");
         }
     }
   };
@@ -99,15 +114,19 @@ const AppContent: React.FC = () => {
           console.error("AI scoring failed, proceeding with default score", error);
       }
       
-      await createApplication({
-          jobId,
-          userId: currentUser.id,
-          matchScore: matchScore 
-      });
+      try {
+        await createApplication({
+            jobId,
+            userId: currentUser.id,
+            matchScore: matchScore 
+        });
+        await refreshData();
+        alert(`Application sent successfully! AI Match Score: ${matchScore}%`);
+      } catch (e: any) {
+          alert(e.message || "Failed to send application. Please try again later.");
+      }
       
       setIsApplying(false);
-      await refreshData();
-      alert(`Application sent successfully! AI Match Score: ${matchScore}%`);
   };
 
   return (

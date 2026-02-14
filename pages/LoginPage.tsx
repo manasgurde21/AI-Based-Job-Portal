@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { loginUser } from '../services/database';
-import { Loader2, Sparkles } from 'lucide-react';
+import { Loader2, Sparkles, AlertCircle } from 'lucide-react';
 
 interface LoginPageProps {
   onLoginSuccess: () => void;
@@ -19,14 +19,15 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, navigate }
     setError('');
     
     try {
-        const user = await loginUser(email, password);
-        if (user) {
-          onLoginSuccess();
+        await loginUser(email, password);
+        onLoginSuccess();
+    } catch (err: any) {
+        console.error(err);
+        if (err.message === 'Failed to fetch') {
+            setError('Cannot connect to server. Please make sure the backend is running on port 5000.');
         } else {
-          setError('Invalid email or password');
+            setError(err.message || 'Invalid email or password');
         }
-    } catch (err) {
-        setError('An error occurred during login');
     } finally {
         setLoading(false);
     }
@@ -48,7 +49,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, navigate }
              <p className="text-secondary small">Login to access your personalized dashboard</p>
           </div>
           
-          {error && <div className="alert alert-danger border-0 bg-danger bg-opacity-10 text-danger rounded-xl mb-4">{error}</div>}
+          {error && (
+            <div className="alert alert-danger border-0 bg-danger bg-opacity-10 text-danger rounded-xl mb-4 d-flex align-items-start">
+                <AlertCircle size={18} className="me-2 mt-1 flex-shrink-0" />
+                <div>{error}</div>
+            </div>
+          )}
 
           <form onSubmit={handleSubmit}>
             <div className="mb-3">

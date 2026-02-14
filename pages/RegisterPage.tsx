@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { registerUser } from '../services/database';
 import { UserRole } from '../types';
-import { Loader2, UserPlus } from 'lucide-react';
+import { Loader2, UserPlus, AlertCircle } from 'lucide-react';
 
 interface RegisterPageProps {
   onLoginSuccess: () => void;
@@ -22,14 +22,15 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onLoginSuccess, navi
     setError('');
 
     try {
-        const user = await registerUser({ name, email, password, role });
-        if (user) {
-          onLoginSuccess();
+        await registerUser({ name, email, password, role });
+        onLoginSuccess();
+    } catch (err: any) {
+        console.error(err);
+        if (err.message === 'Failed to fetch') {
+            setError('Cannot connect to server. Please make sure the backend is running on port 5000.');
         } else {
-          setError('User with this email already exists.');
+            setError(err.message || 'Registration failed.');
         }
-    } catch (err) {
-        setError('Registration failed.');
     } finally {
         setLoading(false);
     }
@@ -51,7 +52,12 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onLoginSuccess, navi
              <p className="text-secondary small">Start your intelligent job search journey</p>
           </div>
           
-          {error && <div className="alert alert-danger border-0 bg-danger bg-opacity-10 text-danger rounded-xl mb-4">{error}</div>}
+          {error && (
+            <div className="alert alert-danger border-0 bg-danger bg-opacity-10 text-danger rounded-xl mb-4 d-flex align-items-start">
+                <AlertCircle size={18} className="me-2 mt-1 flex-shrink-0" />
+                <div>{error}</div>
+            </div>
+          )}
 
           <form onSubmit={handleSubmit}>
             <div className="row g-3">

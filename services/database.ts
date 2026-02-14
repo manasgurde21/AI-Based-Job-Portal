@@ -1,76 +1,51 @@
-import { User, Job, Application, UserRole } from '../types';
-import { MOCK_USER, MOCK_JOBS, MOCK_APPLICATIONS, MOCK_RECRUITER } from '../constants';
 
+import { User, Job, Application } from '../types';
+
+// Use relative path to leverage Vite Proxy defined in vite.config.ts
+// Requests to /api will be forwarded to http://127.0.0.1:5000
+const API_URL = '/api';
 const SESSION_KEY = 'hs_session';
-const STORAGE_PREFIX = 'hs_db_';
 
 // --- Helpers ---
 
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
-const getStorage = <T>(key: string, defaultVal: T): T => {
-    try {
-        const item = localStorage.getItem(STORAGE_PREFIX + key);
-        return item ? JSON.parse(item) : defaultVal;
-    } catch {
-        return defaultVal;
+const handleResponse = async (response: Response) => {
+    if (!response.ok) {
+        // Try to parse JSON error message from server
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.error || response.statusText || 'Request failed');
     }
+    return response.json();
 };
 
-const setStorage = (key: string, value: any) => {
-    localStorage.setItem(STORAGE_PREFIX + key, JSON.stringify(value));
-};
-
-// Initialize DB with Mock Data if empty
-if (!localStorage.getItem(STORAGE_PREFIX + 'jobs')) {
-    setStorage('jobs', MOCK_JOBS);
-}
-if (!localStorage.getItem(STORAGE_PREFIX + 'applications')) {
-    setStorage('applications', MOCK_APPLICATIONS);
-}
-if (!localStorage.getItem(STORAGE_PREFIX + 'users')) {
-    setStorage('users', [MOCK_USER, MOCK_RECRUITER]);
-}
-
-// --- Auth ---
+// --- Auth & Session ---
 
 export const checkBackendHealth = async (): Promise<boolean> => {
-    return true; // Always true in mock mode
+    try {
+        const res = await fetch(`${API_URL}/health`);
+        return res.ok;
+    } catch {
+        return false;
+    }
 };
 
-export const loginUser = async (email: string, password: string): Promise<User | null> => {
-    await delay(500); // Simulate network latency
-    
-    // Check hardcoded mocks first for easy access
-    if (email === MOCK_USER.email) return MOCK_USER;
-    if (email === MOCK_RECRUITER.email) return MOCK_RECRUITER;
-
-    // Check registered users in local storage
-    const users = getStorage<User[]>('users', []);
-    const user = users.find(u => u.email === email);
-    
-    // In a real app we would check password hash, here we just check existence
-    if (user) {
-        localStorage.setItem(SESSION_KEY, JSON.stringify(user));
-        return user;
-    }
-    return null;
+export const loginUser = async (email: string, password: string): Promise<User> => {
+    const user = await handleResponse(await fetch(`${API_URL}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+    }));
+    localStorage.setItem(SESSION_KEY, JSON.stringify(user));
+    return user;
 };
 
-export const registerUser = async (userData: Omit<User, 'id'>): Promise<User | null> => {
-    await delay(500);
-    const users = getStorage<User[]>('users', []);
-    
-    if (users.find(u => u.email === userData.email)) {
-        return null; // User exists
-    }
-
-    const newUser: User = { ...userData, id: `u_${Date.now()}` };
-    users.push(newUser);
-    setStorage('users', users);
-    
-    localStorage.setItem(SESSION_KEY, JSON.stringify(newUser));
-    return newUser;
+export const registerUser = async (userData: Omit<User, 'id'>): Promise<User> => {
+    const user = await handleResponse(await fetch(`${API_URL}/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(userData)
+    }));
+    localStorage.setItem(SESSION_KEY, JSON.stringify(user));
+    return user;
 };
 
 export const logoutUser = async (): Promise<void> => {
@@ -85,93 +60,64 @@ export const getCurrentUser = (): User | null => {
 // --- Users ---
 
 export const getAllUsers = async (): Promise<User[]> => {
-    await delay(200);
-    return getStorage<User[]>('users', [MOCK_USER, MOCK_RECRUITER]);
+    return await handleResponse(await fetch(`${API_URL}/users`));
 };
 
-export const updateUserResume = async (userId: string, resumeText: string): Promise<User | null> => {
+export const updateUserResume = async (userId: string, resumeText: string): Promise<User> => {
     return updateUserProfile(userId, { resumeText });
 };
 
-export const updateUserProfile = async (userId: string, data: Partial<User>): Promise<User | null> => {
-    await delay(300);
-    const users = getStorage<User[]>('users', []);
-    const index = users.findIndex(u => u.id === userId);
-    
-    if (index !== -1) {
-        const updatedUser = { ...users[index], ...data };
-        users[index] = updatedUser;
-        setStorage('users', users);
-        
-        // Update session if it's the current user
-        const currentUser = getCurrentUser();
-        if (currentUser && currentUser.id === userId) {
-            localStorage.setItem(SESSION_KEY, JSON.stringify(updatedUser));
-        }
-        return updatedUser;
+export const updateUserProfile = async (userId: string, data: Partial<User>): Promise<User> => {
+    const updatedUser = await handleResponse(await fetch(`${API_URL}/users/${userId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    }));
+
+    // Update local session if it matches current user
+    const currentUser = getCurrentUser();
+    if (currentUser && currentUser.id === userId) {
+        localStorage.setItem(SESSION_KEY, JSON.stringify(updatedUser));
     }
-    return null;
+    return updatedUser;
 };
 
 // --- Jobs ---
 
 export const getJobs = async (): Promise<Job[]> => {
-    await delay(300);
-    return getStorage<Job[]>('jobs', MOCK_JOBS);
+    return await handleResponse(await fetch(`${API_URL}/jobs`));
 };
 
-export const getJobById = async (id: string): Promise<Job | undefined> => {
-    await delay(100);
-    const jobs = getStorage<Job[]>('jobs', MOCK_JOBS);
-    return jobs.find(j => j.id === id);
+export const getJobById = async (id: string): Promise<Job> => {
+    return await handleResponse(await fetch(`${API_URL}/jobs/${id}`));
 };
 
-export const createJob = async (jobData: Omit<Job, 'id' | 'postedDate'>): Promise<Job | null> => {
-    await delay(800); // Increased delay to ensure write completes before UI reads
-    const jobs = getStorage<Job[]>('jobs', MOCK_JOBS);
-    
-    const newJob: Job = {
-        ...jobData,
-        id: `j_${Date.now()}`,
-        postedDate: new Date().toISOString()
-    };
-    
-    setStorage('jobs', [newJob, ...jobs]);
-    return newJob;
+export const createJob = async (jobData: Omit<Job, 'id' | 'postedDate'>): Promise<Job> => {
+    return await handleResponse(await fetch(`${API_URL}/jobs`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(jobData)
+    }));
 };
 
 // --- Applications ---
 
 export const getApplications = async (): Promise<Application[]> => {
-    await delay(300);
-    return getStorage<Application[]>('applications', MOCK_APPLICATIONS);
+    return await handleResponse(await fetch(`${API_URL}/applications`));
 };
 
-export const createApplication = async (appData: Omit<Application, 'id' | 'appliedDate' | 'status'>): Promise<Application | null> => {
-    await delay(500);
-    const apps = getStorage<Application[]>('applications', MOCK_APPLICATIONS);
-    
-    // Check if already applied
-    if (apps.find(a => a.jobId === appData.jobId && a.userId === appData.userId)) {
-        return null;
-    }
-
-    const newApp: Application = {
-        ...appData,
-        id: `a_${Date.now()}`,
-        status: 'Applied',
-        appliedDate: new Date().toISOString().split('T')[0]
-    };
-    
-    setStorage('applications', [...apps, newApp]);
-    return newApp;
+export const createApplication = async (appData: Omit<Application, 'id' | 'appliedDate' | 'status'>): Promise<Application> => {
+    return await handleResponse(await fetch(`${API_URL}/applications`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(appData)
+    }));
 };
 
 export const updateApplicationStatus = async (appId: string, status: Application['status']): Promise<void> => {
-    await delay(300);
-    const apps = getStorage<Application[]>('applications', MOCK_APPLICATIONS);
-    const updatedApps = apps.map(app => 
-        app.id === appId ? { ...app, status } : app
-    );
-    setStorage('applications', updatedApps);
+    await handleResponse(await fetch(`${API_URL}/applications/${appId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status })
+    }));
 };
