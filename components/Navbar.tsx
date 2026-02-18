@@ -2,7 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { User, UserRole } from '../types';
-import { Briefcase, User as UserIcon, LogOut, PlusCircle, Sparkles, Home, LayoutDashboard, ChevronDown } from 'lucide-react';
+import { Briefcase, User as UserIcon, LogOut, PlusCircle, Sparkles, Home, LayoutDashboard, Database, HardDrive, WifiOff, RefreshCw, Save } from 'lucide-react';
+import { checkBackendHealth } from '../services/database';
 
 interface NavbarProps {
   currentUser: User | null;
@@ -13,13 +14,31 @@ interface NavbarProps {
 export const Navbar: React.FC<NavbarProps> = ({ currentUser, onLogout, navigate }) => {
   const location = useLocation();
   const [scrolled, setScrolled] = useState(false);
+  const [serverStatus, setServerStatus] = useState<{ status: boolean; mode: 'postgres' | 'local_file' | 'memory' | 'offline' }>({ status: false, mode: 'offline' });
+  const [isChecking, setIsChecking] = useState(false);
+
+  const checkHealth = async () => {
+      setIsChecking(true);
+      const health = await checkBackendHealth();
+      setServerStatus(health);
+      setTimeout(() => setIsChecking(false), 500);
+  };
 
   useEffect(() => {
     const handleScroll = () => {
         setScrolled(window.scrollY > 20);
     };
     window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
+    
+    // Check System Health on mount
+    checkHealth();
+    // Poll every 30 seconds
+    const interval = setInterval(checkHealth, 30000);
+
+    return () => {
+        window.removeEventListener('scroll', handleScroll);
+        clearInterval(interval);
+    };
   }, []);
 
   const isActive = (path: string) => {
@@ -72,6 +91,36 @@ export const Navbar: React.FC<NavbarProps> = ({ currentUser, onLogout, navigate 
 
         <div className="collapse navbar-collapse justify-content-end" id="navbarNav">
           <div className="d-flex align-items-center gap-3 pt-3 pt-lg-0">
+            
+            {/* System Status Badge */}
+            <div className="d-none d-lg-flex align-items-center me-2">
+                {serverStatus.mode === 'postgres' && (
+                    <span className="badge bg-primary bg-opacity-10 text-primary border border-primary-subtle d-flex align-items-center gap-1 fw-medium px-2 py-1 rounded-pill" style={{fontSize: '0.7rem'}} title="Connected to PostgreSQL Database">
+                        <Database size={12} /> PostgreSQL
+                    </span>
+                )}
+                {serverStatus.mode === 'local_file' && (
+                    <span className="badge bg-success bg-opacity-10 text-success border border-success-subtle d-flex align-items-center gap-1 fw-medium px-2 py-1 rounded-pill" style={{fontSize: '0.7rem'}} title="Connected to Local File Database (Fallback)">
+                        <Save size={12} /> Local DB
+                    </span>
+                )}
+                {serverStatus.mode === 'memory' && (
+                    <span className="badge bg-warning bg-opacity-10 text-warning border border-warning-subtle d-flex align-items-center gap-1 fw-medium px-2 py-1 rounded-pill" style={{fontSize: '0.7rem'}} title="Backend running in memory mode (Data not saved)">
+                        <HardDrive size={12} /> Server Mem
+                    </span>
+                )}
+                {serverStatus.mode === 'offline' && (
+                     <div className="d-flex align-items-center gap-2">
+                         <span className="badge bg-secondary bg-opacity-10 text-secondary border border-secondary-subtle d-flex align-items-center gap-1 fw-medium px-2 py-1 rounded-pill" style={{fontSize: '0.7rem'}} title="Backend unreachable. Using local browser storage.">
+                            <WifiOff size={12} /> Offline
+                        </span>
+                        <button onClick={checkHealth} className="btn btn-sm btn-link p-0 text-secondary" title="Retry connection">
+                            <RefreshCw size={14} className={isChecking ? 'animate-spin' : ''} />
+                        </button>
+                    </div>
+                )}
+            </div>
+
             {currentUser ? (
               <>
                 {currentUser.role === UserRole.RECRUITER && (

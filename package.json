@@ -1,10 +1,11 @@
+
 {
   "name": "hiresense-ai",
   "private": true,
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "concurrently \"npm run server\" \"vite\"",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "server": "cd server && npm install && node server.js"
